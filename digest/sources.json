@@ -1,0 +1,90 @@
+[
+  {
+    "id": "openai",
+    "name": "OpenAI",
+    "url": "https://openai.com/blog/rss.xml",
+    "level": "official",
+    "lang": "en",
+    "section": "ai"
+  },
+  {
+    "id": "deepmind",
+    "name": "Google DeepMind",
+    "url": "https://deepmind.google/blog/rss.xml",
+    "level": "official",
+    "lang": "en",
+    "section": "ai"
+  },
+  {
+    "id": "qbitai",
+    "name": "量子位",
+    "url": "https://www.qbitai.com/feed",
+    "level": "media",
+    "lang": "zh",
+    "section": "ai"
+  },
+  {
+    "id": "techcrunch",
+    "name": "TechCrunch AI",
+    "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "level": "media",
+    "lang": "en",
+    "section": "ai"
+  },
+  {
+    "id": "geekpark",
+    "name": "极客公园",
+    "url": "https://www.geekpark.net/rss",
+    "level": "media",
+    "lang": "zh",
+    "section": "ai"
+  },
+  {
+    "id": "sspai",
+    "name": "少数派",
+    "url": "https://sspai.com/feed",
+    "level": "media",
+    "lang": "zh",
+    "section": "tech"
+  },
+  {
+    "id": "solidot",
+    "name": "Solidot",
+    "url": "https://www.solidot.org/index.rss",
+    "level": "media",
+    "lang": "zh",
+    "section": "tech"
+  },
+  {
+    "id": "hackernews",
+    "name": "Hacker News",
+    "url": "https://news.ycombinator.com/rss",
+    "level": "community",
+    "lang": "en",
+    "section": "tech"
+  },
+  {
+    "id": "github-trending",
+    "name": "GitHub Trending",
+    "url": "https://mshibanami.github.io/GitHubTrendingRSS/daily/all.xml",
+    "level": "community",
+    "lang": "en",
+    "section": "tech"
+  },
+  {
+    "id": "ft-world",
+    "name": "Financial Times",
+    "url": "https://www.ft.com/world?format=rss",
+    "level": "media",
+    "lang": "en",
+    "section": "world"
+  },
+  {
+    "id": "wallstreetcn",
+    "name": "华尔街见闻",
+    "url": "https://dedicated.wallstreetcn.com/rss.xml",
+    "level": "media",
+    "lang": "zh",
+    "section": "world"
+  }
+]

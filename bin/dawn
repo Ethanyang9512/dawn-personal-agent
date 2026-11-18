@@ -1,0 +1,102 @@
+#!/usr/bin/env node
+import { dataHome } from '../bridge/lib/locations.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+
+process.umask(0o077);
+const root = path.dirname(import.meta.dirname);
+const home = dataHome();
+const configFile = path.join(home, 'config.json');
+const [command = 'help', ...args] = process.argv.slice(2);
+
+function initialFile(file, content) {
+  try { fs.writeFileSync(file, content, { flag: 'wx', mode: 0o600 }); }
+  catch (error) { if (error.code !== 'EEXIST') throw error; }
+}
+
+function init() {
+  const relative = path.relative(root, home);
+  if (relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative))) {
+    throw new Error('Choose a DAWN_HOME outside the source checkout.');
+  }
+  if (!path.isAbsolute(home) || home === os.homedir() || home === path.parse(home).root) throw new Error('DAWN_HOME must be a dedicated directory.');
+  fs.mkdirSync(home, { recursive: true, mode: 0o700 });
+  const defaults = {
+    backend: 'codex', codexBin: 'codex', codexHome: path.join(home, 'codex'),
+    workspace: path.join(home, 'workspace'), obsidianVault: path.join(home, 'vault'),
+    model: null, effort: 'high', proxy: null, alert: { mac: false }
+  };
+  initialFile(configFile, JSON.stringify(defaults, null, 2) + '\n');
+  const cfg = readConfig();
+  const dirs = [cfg.codexHome, ...['state','logs','outgoing'].map(dir => path.join(home, dir)),
+    ...['work','memory','state','发出','收件','projects','routines','.agents/skills/dawn-voice','.agents/skills/dawn-jobs'].map(dir => path.join(cfg.workspace, dir))];
+  if (cfg.obsidianVault) dirs.push(path.join(cfg.obsidianVault, '30_Resources', 'Dawn'));
+  for (const dir of dirs) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  for (const file of ['AGENTS.md','routines/job-preparation.md','.agents/skills/dawn-voice/SKILL.md','.agents/skills/dawn-jobs/SKILL.md']) {
+    initialFile(path.join(cfg.workspace, file), fs.readFileSync(path.join(root, 'templates', file)));
+  }
+  const initialized = path.join(cfg.workspace, 'state', '.initialized');
+  if (!fs.existsSync(initialized)) {
+    initialFile(path.join(cfg.workspace, 'state/tasks.json'), JSON.stringify({ version: 1, tasks: {}, receipts: {} }));
+    initialFile(path.join(cfg.workspace, 'memory/project-sources.json'), JSON.stringify({ version: 1, projects: [] }));
+    initialFile(initialized, '');
+  }
+  initialFile(path.join(cfg.codexHome, 'config.toml'), fs.readFileSync(path.join(root, 'templates/codex.toml')));
+  const toolsDir = path.join(cfg.workspace, 'tools');
+  if (!fs.lstatSync(toolsDir, { throwIfNoEntry: false })) fs.symlinkSync(path.join(root, 'tools'), toolsDir, 'dir');
+  else if (fs.realpathSync(toolsDir) !== fs.realpathSync(path.join(root, 'tools'))) throw new Error('workspace/tools belongs to another checkout. Check its target before changing installations.');
+  console.log('Configuration:', configFile, '\nWorkspace:', cfg.workspace, '\nObsidian:', cfg.obsidianVault || '(off)');
+}
+
+function readConfig() {
+  const cfg = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  for (const key of ['workspace','codexHome', ...(cfg.obsidianVault ? ['obsidianVault'] : [])]) {
+    if (typeof cfg[key] !== 'string' || !path.isAbsolute(cfg[key])) throw new Error(key + ' must be an absolute path');
+  }
+  return cfg;
+}
+
+async function main() {
+  if (command === 'help' || command === '--help') {
+    console.log('dawn init | codex-login | login [--no-open] | start | status | digest [--send] [--date YYYY-MM-DD] | review [--send] [--days N]');
+    return;
+  }
+  if (command === 'init') return init();
+  if (!fs.existsSync(configFile)) throw new Error('Run bin/dawn init first.');
+  const cfg = readConfig();
+  Object.assign(process.env, {
+    DAWN_HOME: home, DAWN_WORKSPACE: cfg.workspace, CODEX_HOME: cfg.codexHome,
+    DAWN_REVIEW_MEMORY_DIR: path.join(cfg.workspace, 'memory'), DAWN_PROJECT_SOURCES_PATH: path.join(cfg.workspace, 'memory', 'project-sources.json'),
+    DAWN_REVIEW_TASKS_STATE: path.join(cfg.workspace, 'state', 'tasks.json')
+  });
+  if (command === 'codex-login') {
+    const result = spawnSync(cfg.codexBin || 'codex', ['login', ...args], { stdio: 'inherit' });
+    if (result.error) throw result.error;
+    process.exitCode = result.status ?? 1;
+    return;
+  }
+  if (command === 'status') {
+    const file = path.join(home, 'state', 'health.json');
+    const health = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+    console.log(JSON.stringify({ paired: fs.existsSync(path.join(home, 'state', 'account.json')),
+      lastPollOkAt: health.lastPollOkAt || null, startedAt: health.startedAt || null, inbox: health.inbox || {} }, null, 2));
+    return;
+  }
+  const entries = { login: 'bridge/login.mjs', start: 'bridge/bridge.mjs', digest: 'digest/run-digest.mjs', review: 'review/run-review.mjs' };
+  if (!Object.hasOwn(entries, command)) throw new Error('Unknown command. See bin/dawn help.');
+  const entry = path.join(root, entries[command]);
+  const options = args.filter(arg => arg !== '--send');
+  if (command === 'digest' || command === 'review') {
+    if (!args.includes('--send')) options.push('--no-send');
+    const i = options.indexOf('--date');
+    if (i >= 0 && !/^\d{4}-\d{2}-\d{2}$/.test(options[i + 1] || '')) throw new Error('Expected --date YYYY-MM-DD.');
+    const d = options.indexOf('--days');
+    if (d >= 0 && !/^[1-9]\d{0,2}$/.test(options[d + 1] || '')) throw new Error('Expected --days from 1 to 999.');
+  }
+  process.argv = [process.execPath, entry, ...options];
+  await import(pathToFileURL(entry).href);
+}
+main().catch(error => { console.error(error.message); process.exitCode = 1; });

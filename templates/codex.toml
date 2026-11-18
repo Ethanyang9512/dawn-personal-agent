@@ -1,0 +1,14 @@
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+web_search = "disabled"
+
+[sandbox_workspace_write]
+network_access = false
+
+[features]
+apps = false
+plugins = false
+remote_plugin = false
+
+[agents]
+enabled = false
